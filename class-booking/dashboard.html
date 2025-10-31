@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Class Slot Booking — Grid View</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: #eef3ff;
+      margin: 0;
+      padding: 0;
+    }
+
+    header {
+      background: #1e3a8a;
+      color: white;
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+
+    header h1 { margin: 0; font-size: 1.1rem; }
+
+    .top-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    select, .btn {
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: none;
+      font-family: inherit;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+
+    .btn {
+      background: #2563eb;
+      color: white;
+      transition: 0.3s ease;
+    }
+    .btn:hover { background: #1e40af; transform: translateY(-1px); }
+
+    .logout { background: #ef4444; }
+    .logout:hover { background: #b91c1c; }
+
+    .container {
+      max-width: 1250px;
+      margin: 1.5rem auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      padding: 1.5rem;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      text-align: center;
+      font-size: 0.9rem;
+      border: 2px solid #000;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    th, td {
+      border: 1px solid #d1d5db;
+      padding: 10px;
+      min-width: 100px;
+    }
+
+    th {
+      background: #e0e7ff;
+      color: #1e3a8a;
+      font-weight: 600;
+      border: 1px solid #000000;
+    }
+
+    tr.day-start td { border-top: 2px solid #000; }
+
+    /* Slot styles */
+    .available {
+      background: #f8fafc;
+      cursor: pointer;
+      border-radius: 6px;
+      transition: 0.3s ease;
+    }
+    .available:hover { background: #e0f2fe; box-shadow: 0 0 10px rgba(37,99,235,0.3); }
+
+    .booked-me {
+      background: #10b981;
+      color: white;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .booked-other {
+      background: #ef4444;
+      color: white;
+      border-radius: 6px;
+      cursor: not-allowed;
+      opacity: 0.9;
+    }
+
+    .lunch {
+      background: #fff8dc;
+      font-weight: 600;
+      color: #92400e;
+      border-radius: 6px;
+    }
+
+    /* My Schedule section */
+    #myScheduleSection {
+      display: none;
+      margin-top: 2rem;
+      background: #f9fafb;
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.05);
+    }
+
+    #myScheduleSection h2 {
+      text-align: center;
+      color: #1e3a8a;
+      margin-bottom: 1rem;
+    }
+
+    .export-btn {
+      display: block;
+      margin: 1rem auto;
+      background: #16a34a;
+    }
+
+    @media print {
+      header, .btn { display: none; }
+      body { background: white; }
+      .container, #myScheduleSection { box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Welcome, <span id="teacherName"></span> 👋</h1>
+    <div class="top-controls">
+      <label><b>Semester:</b></label>
+      <select id="semesterSelect">
+        <option value="1">Sem 1</option>
+        <option value="2">Sem 2</option>
+        <option value="3">Sem 3</option>
+        <option value="4">Sem 4</option>
+        <option value="5">Sem 5</option>
+        <option value="6">Sem 6</option>
+        <option value="7">Sem 7</option>
+        <option value="8">Sem 8</option>
+      </select>
+      <button class="btn" id="weeklyBtn">📅 My Schedule</button>
+      <button class="btn" id="showAllBtn">🔁 Show All</button>
+      <button class="btn" id="exportBtn">📄 Export All</button>
+      <button class="btn" onclick="window.print()">🖨️ Print</button>
+      <button class="btn logout" id="logoutBtn">Logout</button>
+    </div>
+  </header>
+
+  <!-- All Schedule Table -->
+  <div class="container" id="mainContainer">
+    <table id="scheduleTable">
+      <thead>
+        <tr>
+          <th>Day</th>
+          <th>Section</th>
+          <th>1<br>10:45–11:40</th>
+          <th>2<br>11:40–12:35</th>
+          <th>3<br>12:35–1:30</th>
+          <th>🍱 Lunch<br>1:30–2:00</th>
+          <th>4<br>2:00–2:55</th>
+          <th>5<br>2:55–3:50</th>
+          <th>6<br>3:50–4:45</th>
+        </tr>
+      </thead>
+      <tbody id="scheduleBody"></tbody>
+    </table>
+  </div>
+
+  <!-- My Schedule Section -->
+  <div id="myScheduleSection">
+    <h2>📘 My Schedule</h2>
+    <div class="container">
+      <table id="myScheduleTable">
+        <thead>
+          <tr>
+            <th>Day</th>
+            <th>Section</th>
+            <th>1<br>10:45–11:40</th>
+            <th>2<br>11:40–12:35</th>
+            <th>3<br>12:35–1:30</th>
+            <th>🍱 Lunch<br>1:30–2:00</th>
+            <th>4<br>2:00–2:55</th>
+            <th>5<br>2:55–3:50</th>
+            <th>6<br>3:50–4:45</th>
+          </tr>
+        </thead>
+        <tbody id="myScheduleBody"></tbody>
+      </table>
+    </div>
+    <button class="btn export-btn" id="exportMyBtn">📤 Export My Schedule</button>
+  </div>
+
+  <script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+import { getDatabase, ref, onValue, update, remove, get } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDmsT3Kz-OzsApUjlO1y3FIv78TdoKVnvQ",
+  authDomain: "class-slot-booking123.firebaseapp.com",
+  databaseURL: "https://class-slot-booking123-default-rtdb.firebaseio.com",
+  projectId: "class-slot-booking123",
+  storageBucket: "class-slot-booking123.firebasestorage.app",
+  messagingSenderId: "13497074595",
+  appId: "1:13497074595:web:c198824b73765259c61016"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+const teacherName = sessionStorage.getItem("teacherName") || "Akshat";
+document.getElementById("teacherName").textContent = teacherName;
+
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const SLOTS = ["10:45–11:40", "11:40–12:35", "12:35–1:30", "Lunch", "2:00–2:55", "2:55–3:50", "3:50–4:45"];
+let currentSemester = "1";
+let currentData = {};
+
+const semesterSelect = document.getElementById("semesterSelect");
+const scheduleBody = document.getElementById("scheduleBody");
+const myScheduleBody = document.getElementById("myScheduleBody");
+
+// --- Change Semester ---
+semesterSelect.addEventListener("change", () => {
+  currentSemester = semesterSelect.value;
+  loadSemester(currentSemester);
+});
+
+// --- Logout ---
+document.getElementById("logoutBtn").onclick = () => {
+  sessionStorage.removeItem("teacherName");
+  window.location.href = "login.html";
+};
+
+// --- Load Data ---
+function loadSemester(sem) {
+  onValue(ref(db, `bookings/semester-${sem}`), snap => {
+    currentData = snap.val() || {};
+    renderTable();
+  });
+}
+
+// --- Render Full Timetable ---
+function renderTable(data = currentData) {
+  scheduleBody.innerHTML = "";
+  DAYS.forEach(day => {
+    ["A", "B"].forEach(section => {
+      const tr = document.createElement("tr");
+
+      if (section === "A") {
+        const dayCell = document.createElement("td");
+        dayCell.textContent = day;
+        dayCell.rowSpan = 2;
+        tr.appendChild(dayCell);
+      }
+
+      const sectionCell = document.createElement("td");
+      sectionCell.textContent = section === "A" ? "Civil / Mech" : "Computer";
+      tr.appendChild(sectionCell);
+
+      SLOTS.forEach((slot, i) => {
+        if (day === "Saturday" && i > 3) return;
+        const td = document.createElement("td");
+
+        if (slot === "Lunch") {
+          td.textContent = "🍱 Lunch";
+          td.classList.add("lunch");
+        } else {
+          const bookedBy = data?.[section]?.[day]?.[i];
+
+          if (bookedBy) {
+            td.textContent = `Booked by ${bookedBy}`;
+            td.classList.add(bookedBy === teacherName ? "booked-me" : "booked-other");
+
+            if (bookedBy === teacherName) td.onclick = () => cancelSlot(section, day, i);
+          } else {
+            td.textContent = "Available";
+            td.classList.add("available");
+            td.onclick = () => bookSlot(section, day, i);
+          }
+        }
+        tr.appendChild(td);
+      });
+
+      if (section === "A") tr.classList.add("day-start");
+      scheduleBody.appendChild(tr);
+    });
+  });
+}
+
+// --- Book a Slot ---
+async function bookSlot(section, day, i) {
+  const slotRef = ref(db, `bookings/semester-${currentSemester}/${section}/${day}/${i}`);
+  const snap = await get(slotRef);
+
+  if (snap.exists()) {
+    alert("❌ Slot already booked by another teacher!");
+    return;
+  }
+
+  if (confirm(`Book ${day} ${SLOTS[i]} (${section === "A" ? "Civil/Mech" : "Computer"})?`)) {
+    await update(ref(db, `bookings/semester-${currentSemester}/${section}/${day}`), {
+      [i]: teacherName
+    });
+  }
+}
+
+// --- Cancel a Slot ---
+async function cancelSlot(section, day, i) {
+  if (confirm(`Cancel your booking on ${day} (${SLOTS[i]})?`)) {
+    await remove(ref(db, `bookings/semester-${currentSemester}/${section}/${day}/${i}`));
+  }
+}
+
+// --- Weekly Schedule (My Slots) ---
+document.getElementById("weeklyBtn").onclick = () => {
+  document.getElementById("mainContainer").style.display = "none";
+  document.getElementById("myScheduleSection").style.display = "block";
+  renderMySchedule();
+};
+
+// --- Back to All ---
+document.getElementById("showAllBtn").onclick = () => {
+  document.getElementById("mainContainer").style.display = "block";
+  document.getElementById("myScheduleSection").style.display = "none";
+  renderTable();
+};
+
+// --- Render My Schedule Only ---
+function renderMySchedule() {
+  myScheduleBody.innerHTML = "";
+  DAYS.forEach(day => {
+    ["A", "B"].forEach(section => {
+      const tr = document.createElement("tr");
+
+      if (section === "A") {
+        const dayCell = document.createElement("td");
+        dayCell.textContent = day;
+        dayCell.rowSpan = 2;
+        tr.appendChild(dayCell);
+      }
+
+      const sectionCell = document.createElement("td");
+      sectionCell.textContent = section === "A" ? "Civil / Mech" : "Computer";
+      tr.appendChild(sectionCell);
+
+      SLOTS.forEach((slot, i) => {
+        if (day === "Saturday" && i > 3) return;
+        const td = document.createElement("td");
+
+        if (slot === "Lunch") {
+          td.textContent = "🍱";
+          td.classList.add("lunch");
+        } else {
+          const bookedBy = currentData?.[section]?.[day]?.[i];
+          if (bookedBy === teacherName) {
+            td.textContent = `Booked by ${bookedBy}`;
+            td.classList.add("booked-me");
+          } else td.textContent = "";
+        }
+        tr.appendChild(td);
+      });
+
+      if (section === "A") tr.classList.add("day-start");
+      myScheduleBody.appendChild(tr);
+    });
+  });
+}
+
+// --- Export Buttons ---
+document.getElementById("exportBtn").onclick = () => exportExcel(currentData, "All_Schedule");
+document.getElementById("exportMyBtn").onclick = () => exportExcel(getMyData(), "My_Schedule");
+
+// --- Filter only own bookings ---
+function getMyData() {
+  const filtered = { A: {}, B: {} };
+  ["A", "B"].forEach(s => {
+    for (const d in currentData[s]) {
+      for (const i in currentData[s][d]) {
+        if (currentData[s][d][i] === teacherName) {
+          if (!filtered[s][d]) filtered[s][d] = {};
+          filtered[s][d][i] = teacherName;
+        }
+      }
+    }
+  });
+  return filtered;
+}
+
+// --- Export to Excel ---
+function exportExcel(data, filename) {
+  const wb = XLSX.utils.book_new();
+  const ws_data = [["Day", "Section", "Slot", "Time", "Status"]];
+  DAYS.forEach(day => {
+    ["A", "B"].forEach(section => {
+      SLOTS.forEach((slot, i) => {
+        if (day === "Saturday" && i > 3) return;
+        if (slot === "Lunch") return;
+        const bookedBy = data?.[section]?.[day]?.[i];
+        if (bookedBy)
+          ws_data.push([day, section === "A" ? "Civil/Mech" : "Computer", i + 1, slot, "Booked by " + bookedBy]);
+      });
+    });
+  });
+  const ws = XLSX.utils.aoa_to_sheet(ws_data);
+  XLSX.utils.book_append_sheet(wb, ws, "Schedule");
+  XLSX.writeFile(wb, `${filename}_Sem${currentSemester}.xlsx`);
+}
+
+loadSemester(currentSemester);
+</script>
+</body>
+</html>
